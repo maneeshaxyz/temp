@@ -1,4 +1,4 @@
-# ore
+# temp
 k3d cluster create openmailstack
 kubectl apply -f .              
 
