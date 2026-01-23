@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    io.kompose.service: cvdupdate
+  name: cvdupdate
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: cvdupdate
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        io.kompose.service: cvdupdate
+    spec:
+      containers:
+        - image: maneeshuh/cvdupdate-exp:latest
+          name: cvdupdate
+          volumeMounts:
+            - mountPath: /clamav
+              name: signatures
+      restartPolicy: Always
+      volumes:
+        - name: signatures
+          persistentVolumeClaim:
+            claimName: signatures
