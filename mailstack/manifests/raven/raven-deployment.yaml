@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: raven-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: raven
+  template:
+    metadata:
+      labels:
+        app: raven
+    spec:
+      containers:
+        - name: raven
+          image: ghcr.io/lsflk/raven:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 143
+            - containerPort: 993
+            - containerPort: 24
+            - containerPort: 12345
+          env:
+            - name: DB_FILE
+              value: /app/data/databases/shared.db
+          volumeMounts:
+            - name: raven-data
+              mountPath: /app/data
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+      volumes:
+        - name: raven-data
+          persistentVolumeClaim:
+            claimName: raven-data-pvc
+        - name: raven-config
+          hostPath:
+            path: /silver-config/raven/conf
+            type: Directory
+        - name: raven-certs
+          hostPath:
+            path: /silver-config/raven/certs
+            type: Directory
