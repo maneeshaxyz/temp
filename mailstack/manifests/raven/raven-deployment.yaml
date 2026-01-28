@@ -15,7 +15,6 @@ spec:
       containers:
         - name: raven
           image: ghcr.io/lsflk/raven:latest
-          imagePullPolicy: Always
           ports:
             - containerPort: 143
             - containerPort: 993
@@ -27,6 +26,10 @@ spec:
           volumeMounts:
             - name: raven-data
               mountPath: /app/data
+            - name: raven-config
+              mountPath: /etc/raven
+            - name: raven-certs
+              mountPath: /certs
           securityContext:
             runAsUser: 0
             runAsGroup: 0
@@ -36,9 +39,9 @@ spec:
             claimName: raven-data-pvc
         - name: raven-config
           hostPath:
-            path: /silver-config/raven/conf
+            path: /root/mail/silver/services/silver-config/raven/conf
             type: Directory
         - name: raven-certs
           hostPath:
-            path: /silver-config/raven/certs
+            path: /root/mail/silver/services/silver-config/raven/certs
             type: Directory

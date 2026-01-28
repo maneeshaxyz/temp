@@ -5,11 +5,11 @@ metadata:
 spec:
   selector:
     app: raven
-  type: NodePort
+  type: LoadBalancer
   ports:
     - name: imap
-      port: 143
-      targetPort: 143
+      port: 143 # external service port
+      targetPort: 143 # Pod/container port
     - name: imaps
       port: 993
       targetPort: 993
