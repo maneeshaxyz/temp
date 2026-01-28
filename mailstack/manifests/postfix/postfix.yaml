@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smtp-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: smtp
+  template:
+    metadata:
+      labels:
+        app: smtp
+    spec:
+      containers:
+      - name: smtp-server
+        image: tozd/postfix:ubuntu-noble
+        ports:
+        - containerPort: 25
+        env:
+        - name: MYHOSTNAME
+          value: "silver-test.local"
+        - name: MYNETWORKS
+          value: "0.0.0.0/0"
+        - name: LOG_TO_STDOUT
+          value: "1"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: smtp-service
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 25
+    targetPort: 25
+    protocol: TCP
+  selector:
+    app: smtp
