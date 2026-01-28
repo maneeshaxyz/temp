@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: raven-service
+spec:
+  selector:
+    app: raven
+  type: NodePort
+  ports:
+    - name: imap
+      port: 143
+      targetPort: 143
+    - name: imaps
+      port: 993
+      targetPort: 993
+    - name: smtp-alt
+      port: 24
+      targetPort: 24
+    - name: admin
+      port: 12345
+      targetPort: 12345
