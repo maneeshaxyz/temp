@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clamav-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clamav-server
+  template:
+    metadata:
+      labels:
+        app: clamav-server
+    spec:
+      containers:
+        - name: clamav-server
+          image: clamav/clamav:latest
+          env:
+            - name: CLAMAV_NO_FRESHCLAMD
+              value: "false"
+          resources:
+            requests:
+              memory: "1Gi"
+            limits:
+              memory: "3Gi"
+          volumeMounts:
+            - name: clamav-db
+              mountPath: /var/lib/clamav
+            - name: clamav-logs
+              mountPath: /var/log/clamav
+      volumes:
+        - name: clamav-db
+          persistentVolumeClaim:
+            claimName: clamav-db
+        - name: clamav-logs
+          persistentVolumeClaim:
+            claimName: clamav-logs
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: clamav-db
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: clamav-logs
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
