@@ -1,32 +1,21 @@
 deployment:
-  replicaCount: 1  
-  securityContext:
-    readOnlyRootFilesystem: false
-  resources:
-    requests:
-      cpu: 250m      
-      memory: 256Mi  
-    limits:
-      cpu: 500m      
-      memory: 512Mi
-
-ingress:
-  className: traefik
-  hostname: thunder.local
+    replicaCount: 1
+    resources:
+        requests:
+            cpu: 250m
+            memory: 256Mi
+        limits:
+            cpu: 500m
+            memory: 512Mi
 
 configuration:
-  server:
-    httpOnly: true
-    publicURL: http://thunder.local
+    server:
+        publicURL: http://maneesha.xyz
 
-  database:
-    identity:
-      type: sqlite
-    runtime:
-      type: sqlite
-    user:
-      type: sqlite
-
-
-
-
+    database:
+        identity:
+            type: sqlite
+        runtime:
+            type: sqlite
+        user:
+            type: sqlite
