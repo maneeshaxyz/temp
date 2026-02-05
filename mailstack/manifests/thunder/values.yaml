@@ -1,5 +1,7 @@
 deployment:
     replicaCount: 1
+    securityContext:
+        readOnlyRootFilesystem: false
     resources:
         requests:
             cpu: 250m
@@ -10,7 +12,8 @@ deployment:
 
 configuration:
     server:
-        publicURL: http://maneesha.xyz
+        httpOnly: true
+        publicURL: "{{.PUBLIC_URL}}"
 
     database:
         identity:
