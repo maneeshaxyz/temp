@@ -1,0 +1,32 @@
+deployment:
+  replicaCount: 1  
+  securityContext:
+    readOnlyRootFilesystem: false
+  resources:
+    requests:
+      cpu: 250m      
+      memory: 256Mi  
+    limits:
+      cpu: 500m      
+      memory: 512Mi
+
+ingress:
+  className: traefik
+  hostname: thunder.local
+
+configuration:
+  server:
+    httpOnly: true
+    publicURL: http://thunder.local
+
+  database:
+    identity:
+      type: sqlite
+    runtime:
+      type: sqlite
+    user:
+      type: sqlite
+
+
+
+
