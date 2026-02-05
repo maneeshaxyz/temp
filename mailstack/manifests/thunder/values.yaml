@@ -13,7 +13,7 @@ deployment:
 configuration:
     server:
         httpOnly: true
-        publicURL: "{{.PUBLIC_URL}}"
+        publicURL: "{{.PUBLIC_URL}}" # Set to your public URL
 
     database:
         identity:
