@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opendkim-server
+  labels:
+    app: opendkim
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opendkim
+  template:
+    metadata:
+      labels:
+        app: opendkim
+    spec:
+      containers:
+        - name: opendkim
+          image: ghcr.io/lsflk/silver-dkim:main
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: silver-config
+              mountPath: /etc/opendkim/silver.yaml
+            - name: keytable
+              mountPath: /etc/opendkim/KeyTable
+            - name: opendkim-conf
+              mountPath: /etc/opendkim/opendkim.conf
+            - name: signingtable
+              mountPath: /etc/opendkim/SigningTable
+            - name: trustedhosts
+              mountPath: /etc/opendkim/TrustedHosts
+      volumes:
+        - name: silver-config
+          hostPath:
+            path: /root/mail/silver/conf/silver.yaml
+            type: File
+        - name: keytable
+          hostPath:
+            path: /root/mail/silver/services/silver-config/opendkim/KeyTable
+            type: File
+        - name: opendkim-conf
+          hostPath:
+            path: /root/mail/silver/services/silver-config/opendkim/opendkim.conf
+            type: File
+        - name: signingtable
+          hostPath:
+            path: /root/mail/silver/services/silver-config/opendkim/SigningTable
+            type: File
+        - name: trustedhosts
+          hostPath:
+            path: /root/mail/silver/services/silver-config/opendkim/TrustedHosts
+            type: File
+        - name: dkim-keys
+          persistentVolumeClaim:
+            claimName: dkim-keys-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dkim-keys-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
