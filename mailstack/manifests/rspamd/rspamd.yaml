@@ -21,7 +21,6 @@ spec:
           name: rspamd-server
           ports:
             - containerPort: 11332
-              protocol: TCP
             - containerPort: 11334
               protocol: TCP
           volumeMounts:
@@ -51,10 +50,10 @@ metadata:
   name: rspamd-server
 spec:
   ports:
-    - name: "11332"
+    - name: "proxy"
       port: 11332
       targetPort: 11332
-    - name: "11334"
+    - name: "controller"
       port: 11334
       targetPort: 11334
   selector:
