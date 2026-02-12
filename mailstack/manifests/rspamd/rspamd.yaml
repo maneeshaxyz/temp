@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: rspamd-server
+  name: rspamd-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rspamd-server
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: rspamd-server
+    spec:
+      containers:
+        - image: rspamd/rspamd:latest
+          name: rspamd-server
+          ports:
+            - containerPort: 11332
+            - containerPort: 11334
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /var/lib/rspamd
+              name: rspamd-data
+            - mountPath: /var/log/rspamd
+              name: rspamd-logs
+            - mountPath: /etc/rspamd/local.d
+              name: rspamd-server-claim2
+              readOnly: true
+      hostname: rspamd
+      volumes:
+        - name: rspamd-data
+          persistentVolumeClaim:
+            claimName: rspamd-data
+        - name: rspamd-logs
+          persistentVolumeClaim:
+            claimName: rspamd-logs
+        - name: rspamd-server-claim2
+          persistentVolumeClaim:
+            claimName: rspamd-server-claim2
+            readOnly: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rspamd-server
+spec:
+  ports:
+    - name: "proxy"
+      port: 11332
+      targetPort: 11332
+    - name: "controller"
+      port: 11334
+      targetPort: 11334
+  selector:
+    app: rspamd-server
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rspamd-server-claim2
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rspamd-logs
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rspamd-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
