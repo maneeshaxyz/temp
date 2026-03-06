@@ -25,27 +25,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := decodeJSONBody(r.Body); err != nil {
-		if errors.Is(err, io.EOF) {
+		switch {
+		case errors.Is(err, io.EOF):
 			writeError(w, http.StatusBadRequest, errBodyRequired)
-			return
-		}
-		if errors.Is(err, errMultipleJSONObjects) {
+		case errors.Is(err, errMultipleJSONObjects):
 			writeError(w, http.StatusBadRequest, errSingleJSONObject)
-			return
-		}
-		if errors.Is(err, errMissingTimestamp) {
+		case errors.Is(err, errMissingTimestamp):
 			writeError(w, http.StatusBadRequest, errTimestampRequired)
-			return
-		}
-		if errors.Is(err, errTimestampNotString) {
+		case errors.Is(err, errTimestampNotString):
 			writeError(w, http.StatusBadRequest, errTimestampString)
-			return
-		}
-		if errors.Is(err, errTimestampNotRFC3339) {
+		case errors.Is(err, errTimestampNotRFC3339):
 			writeError(w, http.StatusBadRequest, errTimestampRFC3339)
-			return
+		default:
+			writeError(w, http.StatusBadRequest, errInvalidJSONText)
 		}
-		writeError(w, http.StatusBadRequest, errInvalidJSONText)
 		return
 	}
 

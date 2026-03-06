@@ -38,4 +38,4 @@ clean:
 	rm -f ./bin/intake
 
 # --- Phony targets ---
-.PHONY: fmt vet test testcov lint gci build dbuild drun linux run clean
+.PHONY: fmt vet test lint gci build dbuild drun linux run clean
