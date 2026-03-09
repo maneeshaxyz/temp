@@ -6,7 +6,11 @@ Minimal Go HTTP service for receiving silver instance events.
 
 - Exposes `POST /v1/silver/events`
 - Requires `Content-Type: application/json`
-- Requires a `timestamp` field in RFC3339 format
+- Requires these fields:
+  - `timestamp` (RFC3339 string)
+  - `instance_id` (non-empty string)
+  - `signature_version` (non-empty string)
+  - `signature_updated_at` (RFC3339 string)
 - Returns `202 Accepted` when valid
 
 No auth is implemented yet.
@@ -48,13 +52,13 @@ go build -o bin/intake ./cmd/intake
 curl -i \
   -X POST http://localhost:8080/v1/silver/events \
   -H 'Content-Type: application/json' \
-  -d '{"timestamp":"2026-03-05T10:30:45Z","event":"scan_complete","instance_id":"silver-01"}'
+  -d '{"timestamp":"2026-03-09T03:58:07Z","instance_id":"172.25.0.19","signature_version":"daily.cld:0","signature_updated_at":"2026-03-08T07:57:37Z"}'
 ```
 
 ## Response behavior
 
 - `202` valid payload with body `{"ok":true}`
-- `400` malformed JSON or missing/invalid `timestamp`
+- `400` malformed JSON or missing/invalid required fields
 - `405` method not allowed
 - `415` unsupported media type
 
