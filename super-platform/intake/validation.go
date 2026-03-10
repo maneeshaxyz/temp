@@ -36,68 +36,80 @@ func isJSONContentType(contentType string) bool {
 	return mediaType == "application/json"
 }
 
-func decodeJSONBody(r io.Reader) (map[string]any, error) {
+type inboundEvent struct {
+	Timestamp          string
+	InstanceID         string
+	SignatureVersion   string
+	SignatureUpdatedAt string
+}
+
+func decodeJSONBody(r io.Reader) (inboundEvent, error) {
 	var body map[string]any
 	decoder := json.NewDecoder(r)
 	if err := decoder.Decode(&body); err != nil {
 		if errors.Is(err, io.EOF) {
-			return nil, io.EOF
+			return inboundEvent{}, io.EOF
 		}
-		return nil, errInvalidJSON
+		return inboundEvent{}, errInvalidJSON
 	}
 
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		return nil, errMultipleJSONObjects
+		return inboundEvent{}, errMultipleJSONObjects
 	}
 
 	tsRaw, ok := body["timestamp"]
 	if !ok {
-		return nil, errMissingTimestamp
+		return inboundEvent{}, errMissingTimestamp
 	}
 	ts, ok := tsRaw.(string)
 	if !ok {
-		return nil, errTimestampNotString
+		return inboundEvent{}, errTimestampNotString
 	}
 
 	if _, err := time.Parse(time.RFC3339, ts); err != nil {
-		return nil, errTimestampNotRFC3339
+		return inboundEvent{}, errTimestampNotRFC3339
 	}
 
 	instanceIDRaw, ok := body["instance_id"]
 	if !ok {
-		return nil, errMissingInstanceID
+		return inboundEvent{}, errMissingInstanceID
 	}
 	instanceID, ok := instanceIDRaw.(string)
 	if !ok {
-		return nil, errInstanceIDNotString
+		return inboundEvent{}, errInstanceIDNotString
 	}
 	if instanceID == "" {
-		return nil, errInstanceIDEmptyErr
+		return inboundEvent{}, errInstanceIDEmptyErr
 	}
 
 	sigVersionRaw, ok := body["signature_version"]
 	if !ok {
-		return nil, errMissingSigVersion
+		return inboundEvent{}, errMissingSigVersion
 	}
 	sigVersion, ok := sigVersionRaw.(string)
 	if !ok {
-		return nil, errSigVersionNotString
+		return inboundEvent{}, errSigVersionNotString
 	}
 	if sigVersion == "" {
-		return nil, errSigVersionEmptyErr
+		return inboundEvent{}, errSigVersionEmptyErr
 	}
 
 	sigUpdatedAtRaw, ok := body["signature_updated_at"]
 	if !ok {
-		return nil, errMissingSigUpdatedAt
+		return inboundEvent{}, errMissingSigUpdatedAt
 	}
 	sigUpdatedAt, ok := sigUpdatedAtRaw.(string)
 	if !ok {
-		return nil, errSigUpdatedAtNotStr
+		return inboundEvent{}, errSigUpdatedAtNotStr
 	}
 	if _, err := time.Parse(time.RFC3339, sigUpdatedAt); err != nil {
-		return nil, errSigUpdatedAtRFC3339Err
+		return inboundEvent{}, errSigUpdatedAtRFC3339Err
 	}
 
-	return body, nil
+	return inboundEvent{
+		Timestamp:          ts,
+		InstanceID:         instanceID,
+		SignatureVersion:   sigVersion,
+		SignatureUpdatedAt: sigUpdatedAt,
+	}, nil
 }

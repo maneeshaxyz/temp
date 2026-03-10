@@ -111,42 +111,33 @@ type outboundResultsPayload struct {
 	Timestamp string         `json:"timestamp"`
 }
 
-func (h *Handler) sendResults(event map[string]any) {
+func (h *Handler) sendResults(event inboundEvent) {
 	if h.apiKey == "" {
 		slog.Error("skipping outbound results callback: missing API key", "env", outboundAPIKeyEnvVar)
-		return
-	}
-
-	instanceID, _ := event["instance_id"].(string)
-	timestamp, _ := event["timestamp"].(string)
-	signatureVersion, _ := event["signature_version"].(string)
-	signatureUpdatedAt, _ := event["signature_updated_at"].(string)
-	if instanceID == "" {
-		slog.Error("skipping outbound results callback: missing instance_id")
 		return
 	}
 
 	payload := outboundResultsPayload{
 		Status: outboundStatusSuccess,
 		Data: map[string]any{
-			"timestamp":            timestamp,
-			"instance_id":          instanceID,
-			"signature_version":    signatureVersion,
-			"signature_updated_at": signatureUpdatedAt,
+			"timestamp":            event.Timestamp,
+			"instance_id":          event.InstanceID,
+			"signature_version":    event.SignatureVersion,
+			"signature_updated_at": event.SignatureUpdatedAt,
 		},
-		Timestamp: timestamp,
+		Timestamp: event.Timestamp,
 	}
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		slog.Error("failed to marshal outbound results payload", "error", err, "instance_id", instanceID)
+		slog.Error("failed to marshal outbound results payload", "error", err, "instance_id", event.InstanceID)
 		return
 	}
 
-	destination := buildResultsURL(instanceID)
+	destination := buildResultsURL(event.InstanceID)
 	req, err := http.NewRequest(http.MethodPost, destination, bytes.NewReader(body))
 	if err != nil {
-		slog.Error("failed to build outbound results request", "error", err, "destination", destination, "instance_id", instanceID)
+		slog.Error("failed to build outbound results request", "error", err, "destination", destination, "instance_id", event.InstanceID)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -154,18 +145,28 @@ func (h *Handler) sendResults(event map[string]any) {
 
 	resp, err := h.client.Do(req)
 	if err != nil {
-		slog.Error("outbound results callback failed", "error", err, "destination", destination, "instance_id", instanceID)
+		slog.Error("outbound results callback failed", "error", err, "destination", destination, "instance_id", event.InstanceID)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		errorBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		errorBody, err := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		if err != nil {
+			slog.Error(
+				"outbound results callback returned non-2xx and failed to read body",
+				"status_code", resp.StatusCode,
+				"destination", destination,
+				"instance_id", event.InstanceID,
+				"read_error", err,
+			)
+			return
+		}
 		slog.Error(
 			"outbound results callback returned non-2xx",
 			"status_code", resp.StatusCode,
 			"destination", destination,
-			"instance_id", instanceID,
+			"instance_id", event.InstanceID,
 			"body", strings.TrimSpace(string(errorBody)),
 		)
 	}

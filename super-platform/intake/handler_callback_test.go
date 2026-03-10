@@ -55,55 +55,58 @@ func TestHandlerSendsOutboundResultsRequest(t *testing.T) {
 	h.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusAccepted {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusAccepted)
+		t.Errorf("status = %d, want %d", rr.Code, http.StatusAccepted)
 	}
 
 	var outbound outboundRequest
 	select {
 	case outbound = <-reqCh:
 	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for outbound callback")
+		t.Errorf("timed out waiting for outbound callback")
+		return
 	}
 
 	if outbound.Method != http.MethodPost {
-		t.Fatalf("method = %q, want %q", outbound.Method, http.MethodPost)
+		t.Errorf("method = %q, want %q", outbound.Method, http.MethodPost)
 	}
 	if outbound.URL != "http://172.25.0.19:8888/api/results" {
-		t.Fatalf("url = %q, want %q", outbound.URL, "http://172.25.0.19:8888/api/results")
+		t.Errorf("url = %q, want %q", outbound.URL, "http://172.25.0.19:8888/api/results")
 	}
 	if outbound.ContentType != "application/json" {
-		t.Fatalf("content type = %q, want %q", outbound.ContentType, "application/json")
+		t.Errorf("content type = %q, want %q", outbound.ContentType, "application/json")
 	}
 	if outbound.APIKey != "test-api-key" {
-		t.Fatalf("X-API-Key = %q, want %q", outbound.APIKey, "test-api-key")
+		t.Errorf("X-API-Key = %q, want %q", outbound.APIKey, "test-api-key")
 	}
 
 	var payload map[string]any
 	if err := json.Unmarshal(outbound.Body, &payload); err != nil {
-		t.Fatalf("failed to unmarshal outbound body: %v", err)
+		t.Errorf("failed to unmarshal outbound body: %v", err)
+		return
 	}
 	if payload["status"] != "success" {
-		t.Fatalf("status = %v, want %q", payload["status"], "success")
+		t.Errorf("status = %v, want %q", payload["status"], "success")
 	}
 	if payload["timestamp"] != "2026-03-05T10:30:45Z" {
-		t.Fatalf("timestamp = %v, want %q", payload["timestamp"], "2026-03-05T10:30:45Z")
+		t.Errorf("timestamp = %v, want %q", payload["timestamp"], "2026-03-05T10:30:45Z")
 	}
 
 	data, ok := payload["data"].(map[string]any)
 	if !ok {
-		t.Fatalf("data = %T, want map[string]any", payload["data"])
+		t.Errorf("data = %T, want map[string]any", payload["data"])
+		return
 	}
 	if data["instance_id"] != "172.25.0.19" {
-		t.Fatalf("data.instance_id = %v, want %q", data["instance_id"], "172.25.0.19")
+		t.Errorf("data.instance_id = %v, want %q", data["instance_id"], "172.25.0.19")
 	}
 	if data["signature_version"] != "daily.cld:0" {
-		t.Fatalf("data.signature_version = %v, want %q", data["signature_version"], "daily.cld:0")
+		t.Errorf("data.signature_version = %v, want %q", data["signature_version"], "daily.cld:0")
 	}
 	if data["signature_updated_at"] != "2026-03-08T07:57:37Z" {
-		t.Fatalf("data.signature_updated_at = %v, want %q", data["signature_updated_at"], "2026-03-08T07:57:37Z")
+		t.Errorf("data.signature_updated_at = %v, want %q", data["signature_updated_at"], "2026-03-08T07:57:37Z")
 	}
 	if data["timestamp"] != "2026-03-05T10:30:45Z" {
-		t.Fatalf("data.timestamp = %v, want %q", data["timestamp"], "2026-03-05T10:30:45Z")
+		t.Errorf("data.timestamp = %v, want %q", data["timestamp"], "2026-03-05T10:30:45Z")
 	}
 }
 

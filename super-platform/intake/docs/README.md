@@ -97,28 +97,6 @@ Request body shape:
 
 The endpoint still returns `202` immediately; outbound callback failures are logged and dropped (no retries in this version).
 
-## Process client response
-
-Use `ProcessEventsResponse` to convert the HTTP response into a simple success/error flow:
-
-```go
-resp, err := http.Post("http://localhost:8080/v1/silver/events", "application/json", bytes.NewReader(payload))
-if err != nil {
-	// network failure
-}
-defer resp.Body.Close()
-
-if err := intake.ProcessEventsResponse(resp); err != nil {
-	var apiErr *intake.EventsResponseError
-	if errors.As(err, &apiErr) {
-		// handle structured server error
-		// apiErr.Status, apiErr.Message, apiErr.Body
-	} else {
-		// fallback transport/parse error
-	}
-}
-```
-
 ## Push to GHCR
 
 ```bash
