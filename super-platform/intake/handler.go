@@ -3,10 +3,10 @@ package intake
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"mime"
 	"net/http"
 	"os"
 	"strings"
@@ -14,11 +14,23 @@ import (
 )
 
 const (
+	EventsPath            = "/v1/silver/events"
 	outboundStatusSuccess = "success"
 	outboundAPIKeyEnvVar  = "X_API_KEY"
 	outboundAPIKeyHeader  = "X-API-Key"
 	outboundURLFormat     = "http://%s:8888/api/results"
 	outboundHTTPTimeout   = 5 * time.Second
+
+	errMethodNotAllowed     = "method not allowed"
+	errContentTypeJSON      = "content type must be application/json"
+	errBodyRequired         = "request body is required"
+	errInvalidJSONText      = "invalid JSON"
+	errTimestampRequired    = "timestamp is required"
+	errTimestampRFC3339     = "timestamp must be RFC3339"
+	errInstanceIDRequired   = "instance_id is required"
+	errSigVersionRequired   = "signature_version is required"
+	errSigUpdatedAtRequired = "signature_updated_at is required"
+	errSigUpdatedAtRFC3339  = "signature_updated_at must be RFC3339"
 )
 
 type Handler struct {
@@ -26,89 +38,46 @@ type Handler struct {
 	apiKey string
 }
 
-func NewHandler() *Handler {
-	return newHandlerWithDeps(
-		&http.Client{Timeout: outboundHTTPTimeout},
-		strings.TrimSpace(os.Getenv(outboundAPIKeyEnvVar)),
-	)
-}
-
-func newHandlerWithDeps(client *http.Client, apiKey string) *Handler {
-	if client == nil {
-		client = &http.Client{Timeout: outboundHTTPTimeout}
-	}
-	return &Handler{
-		client: client,
-		apiKey: strings.TrimSpace(apiKey),
-	}
-}
-
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		writeEventsResponse(w, http.StatusMethodNotAllowed, errMethodNotAllowed)
-		return
-	}
-
-	if !isJSONContentType(r.Header.Get("Content-Type")) {
-		writeEventsResponse(w, http.StatusUnsupportedMediaType, errContentTypeJSON)
-		return
-	}
-
-	body, err := decodeJSONBody(r.Body)
-	if err != nil {
-		switch {
-		case errors.Is(err, io.EOF):
-			writeEventsResponse(w, http.StatusBadRequest, errBodyRequired)
-		case errors.Is(err, errMultipleJSONObjects):
-			writeEventsResponse(w, http.StatusBadRequest, errSingleJSONObject)
-		case errors.Is(err, errMissingTimestamp):
-			writeEventsResponse(w, http.StatusBadRequest, errTimestampRequired)
-		case errors.Is(err, errTimestampNotString):
-			writeEventsResponse(w, http.StatusBadRequest, errTimestampString)
-		case errors.Is(err, errTimestampNotRFC3339):
-			writeEventsResponse(w, http.StatusBadRequest, errTimestampRFC3339)
-		case errors.Is(err, errMissingInstanceID):
-			writeEventsResponse(w, http.StatusBadRequest, errInstanceIDRequired)
-		case errors.Is(err, errInstanceIDNotString):
-			writeEventsResponse(w, http.StatusBadRequest, errInstanceIDString)
-		case errors.Is(err, errInstanceIDEmptyErr):
-			writeEventsResponse(w, http.StatusBadRequest, errInstanceIDEmpty)
-		case errors.Is(err, errMissingSigVersion):
-			writeEventsResponse(w, http.StatusBadRequest, errSigVersionRequired)
-		case errors.Is(err, errSigVersionNotString):
-			writeEventsResponse(w, http.StatusBadRequest, errSigVersionString)
-		case errors.Is(err, errSigVersionEmptyErr):
-			writeEventsResponse(w, http.StatusBadRequest, errSigVersionEmpty)
-		case errors.Is(err, errMissingSigUpdatedAt):
-			writeEventsResponse(w, http.StatusBadRequest, errSigUpdatedAtRequired)
-		case errors.Is(err, errSigUpdatedAtNotStr):
-			writeEventsResponse(w, http.StatusBadRequest, errSigUpdatedAtString)
-		case errors.Is(err, errSigUpdatedAtRFC3339Err):
-			writeEventsResponse(w, http.StatusBadRequest, errSigUpdatedAtRFC3339)
-		default:
-			writeEventsResponse(w, http.StatusBadRequest, errInvalidJSONText)
-		}
-		return
-	}
-
-	go h.sendResults(body)
-	writeEventsResponse(w, http.StatusAccepted, "")
-}
-
-func writeEventsResponse(w http.ResponseWriter, status int, message string) {
-	if status == http.StatusAccepted {
-		writeStatusAccepted(w)
-		return
-	}
-
-	writeError(w, status, message)
+type inboundEvent struct {
+	Timestamp          string `json:"timestamp"`
+	InstanceID         string `json:"instance_id"`
+	SignatureVersion   string `json:"signature_version"`
+	SignatureUpdatedAt string `json:"signature_updated_at"`
 }
 
 type outboundResultsPayload struct {
 	Status    string         `json:"status"`
 	Data      map[string]any `json:"data"`
 	Timestamp string         `json:"timestamp"`
+}
+
+func NewHandler() *Handler {
+	return &Handler{
+		client: &http.Client{Timeout: outboundHTTPTimeout},
+		apiKey: strings.TrimSpace(os.Getenv(outboundAPIKeyEnvVar)),
+	}
+}
+
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
+		writeError(w, http.StatusMethodNotAllowed, errMethodNotAllowed)
+		return
+	}
+
+	if !isJSONContentType(r.Header.Get("Content-Type")) {
+		writeError(w, http.StatusUnsupportedMediaType, errContentTypeJSON)
+		return
+	}
+
+	event, errMessage := decodeAndValidateEvent(r.Body)
+	if errMessage != "" {
+		writeError(w, http.StatusBadRequest, errMessage)
+		return
+	}
+
+	go h.sendResults(event)
+	writeJSON(w, http.StatusAccepted, map[string]bool{"ok": true})
 }
 
 func (h *Handler) sendResults(event inboundEvent) {
@@ -143,7 +112,12 @@ func (h *Handler) sendResults(event inboundEvent) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(outboundAPIKeyHeader, h.apiKey)
 
-	resp, err := h.client.Do(req)
+	client := h.client
+	if client == nil {
+		client = &http.Client{Timeout: outboundHTTPTimeout}
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		slog.Error("outbound results callback failed", "error", err, "destination", destination, "instance_id", event.InstanceID)
 		return
@@ -174,4 +148,71 @@ func (h *Handler) sendResults(event inboundEvent) {
 
 func buildResultsURL(instanceID string) string {
 	return fmt.Sprintf(outboundURLFormat, instanceID)
+}
+
+func decodeAndValidateEvent(r io.Reader) (inboundEvent, string) {
+	var event inboundEvent
+
+	decoder := json.NewDecoder(r)
+	if err := decoder.Decode(&event); err != nil {
+		if err == io.EOF {
+			return inboundEvent{}, errBodyRequired
+		}
+		return inboundEvent{}, errInvalidJSONText
+	}
+
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		return inboundEvent{}, errInvalidJSONText
+	}
+
+	event.Timestamp = strings.TrimSpace(event.Timestamp)
+	event.InstanceID = strings.TrimSpace(event.InstanceID)
+	event.SignatureVersion = strings.TrimSpace(event.SignatureVersion)
+	event.SignatureUpdatedAt = strings.TrimSpace(event.SignatureUpdatedAt)
+
+	if event.Timestamp == "" {
+		return inboundEvent{}, errTimestampRequired
+	}
+	if _, err := time.Parse(time.RFC3339, event.Timestamp); err != nil {
+		return inboundEvent{}, errTimestampRFC3339
+	}
+	if event.InstanceID == "" {
+		return inboundEvent{}, errInstanceIDRequired
+	}
+	if event.SignatureVersion == "" {
+		return inboundEvent{}, errSigVersionRequired
+	}
+	if event.SignatureUpdatedAt == "" {
+		return inboundEvent{}, errSigUpdatedAtRequired
+	}
+	if _, err := time.Parse(time.RFC3339, event.SignatureUpdatedAt); err != nil {
+		return inboundEvent{}, errSigUpdatedAtRFC3339
+	}
+
+	return event, ""
+}
+
+func isJSONContentType(contentType string) bool {
+	if contentType == "" {
+		return false
+	}
+
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return false
+	}
+
+	return mediaType == "application/json"
+}
+
+func writeError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, map[string]string{"error": message})
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		http.Error(w, "failed to write response", http.StatusInternalServerError)
+	}
 }

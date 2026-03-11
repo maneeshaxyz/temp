@@ -24,7 +24,8 @@ func main() {
 	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	mux := intake.NewMux()
+	mux := http.NewServeMux()
+	mux.Handle(intake.EventsPath, intake.NewHandler())
 
 	server := &http.Server{
 		Addr:              ":" + port,
@@ -36,7 +37,10 @@ func main() {
 	}
 
 	logger.Info("starting intake server", "addr", server.Addr)
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+
+	err := server.ListenAndServe()
+
+	if err != nil && err != http.ErrServerClosed {
 		logger.Error("server exited with error", "error", err)
 		os.Exit(1)
 	}

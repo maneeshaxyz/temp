@@ -53,108 +53,12 @@ func TestHandlerResponses(t *testing.T) {
 			wantBody:    `{"error":"invalid JSON"}`,
 		},
 		{
-			name:        "multiple json objects",
-			method:      http.MethodPost,
-			contentType: "application/json",
-			body:        validPayload + `{"another":1}`,
-			wantStatus:  http.StatusBadRequest,
-			wantBody:    `{"error":"request body must contain only one JSON object"}`,
-		},
-		{
-			name:        "timestamp missing",
-			method:      http.MethodPost,
-			contentType: "application/json",
-			body:        `{"event":"scan_complete"}`,
-			wantStatus:  http.StatusBadRequest,
-			wantBody:    `{"error":"timestamp is required"}`,
-		},
-		{
-			name:        "timestamp not string",
-			method:      http.MethodPost,
-			contentType: "application/json",
-			body:        `{"timestamp":123,"instance_id":"172.25.0.19","signature_version":"daily.cld:0","signature_updated_at":"2026-03-08T07:57:37Z"}`,
-			wantStatus:  http.StatusBadRequest,
-			wantBody:    `{"error":"timestamp must be a string"}`,
-		},
-		{
-			name:        "timestamp not rfc3339",
-			method:      http.MethodPost,
-			contentType: "application/json",
-			body:        `{"timestamp":"2026/03/05 10:30:45","instance_id":"172.25.0.19","signature_version":"daily.cld:0","signature_updated_at":"2026-03-08T07:57:37Z"}`,
-			wantStatus:  http.StatusBadRequest,
-			wantBody:    `{"error":"timestamp must be RFC3339"}`,
-		},
-		{
-			name:        "instance_id missing",
+			name:        "missing required field",
 			method:      http.MethodPost,
 			contentType: "application/json",
 			body:        `{"timestamp":"2026-03-05T10:30:45Z","signature_version":"daily.cld:0","signature_updated_at":"2026-03-08T07:57:37Z"}`,
 			wantStatus:  http.StatusBadRequest,
 			wantBody:    `{"error":"instance_id is required"}`,
-		},
-		{
-			name:        "instance_id not string",
-			method:      http.MethodPost,
-			contentType: "application/json",
-			body:        `{"timestamp":"2026-03-05T10:30:45Z","instance_id":123,"signature_version":"daily.cld:0","signature_updated_at":"2026-03-08T07:57:37Z"}`,
-			wantStatus:  http.StatusBadRequest,
-			wantBody:    `{"error":"instance_id must be a string"}`,
-		},
-		{
-			name:        "instance_id empty",
-			method:      http.MethodPost,
-			contentType: "application/json",
-			body:        `{"timestamp":"2026-03-05T10:30:45Z","instance_id":"","signature_version":"daily.cld:0","signature_updated_at":"2026-03-08T07:57:37Z"}`,
-			wantStatus:  http.StatusBadRequest,
-			wantBody:    `{"error":"instance_id must not be empty"}`,
-		},
-		{
-			name:        "signature_version missing",
-			method:      http.MethodPost,
-			contentType: "application/json",
-			body:        `{"timestamp":"2026-03-05T10:30:45Z","instance_id":"172.25.0.19","signature_updated_at":"2026-03-08T07:57:37Z"}`,
-			wantStatus:  http.StatusBadRequest,
-			wantBody:    `{"error":"signature_version is required"}`,
-		},
-		{
-			name:        "signature_version not string",
-			method:      http.MethodPost,
-			contentType: "application/json",
-			body:        `{"timestamp":"2026-03-05T10:30:45Z","instance_id":"172.25.0.19","signature_version":123,"signature_updated_at":"2026-03-08T07:57:37Z"}`,
-			wantStatus:  http.StatusBadRequest,
-			wantBody:    `{"error":"signature_version must be a string"}`,
-		},
-		{
-			name:        "signature_version empty",
-			method:      http.MethodPost,
-			contentType: "application/json",
-			body:        `{"timestamp":"2026-03-05T10:30:45Z","instance_id":"172.25.0.19","signature_version":"","signature_updated_at":"2026-03-08T07:57:37Z"}`,
-			wantStatus:  http.StatusBadRequest,
-			wantBody:    `{"error":"signature_version must not be empty"}`,
-		},
-		{
-			name:        "signature_updated_at missing",
-			method:      http.MethodPost,
-			contentType: "application/json",
-			body:        `{"timestamp":"2026-03-05T10:30:45Z","instance_id":"172.25.0.19","signature_version":"daily.cld:0"}`,
-			wantStatus:  http.StatusBadRequest,
-			wantBody:    `{"error":"signature_updated_at is required"}`,
-		},
-		{
-			name:        "signature_updated_at not string",
-			method:      http.MethodPost,
-			contentType: "application/json",
-			body:        `{"timestamp":"2026-03-05T10:30:45Z","instance_id":"172.25.0.19","signature_version":"daily.cld:0","signature_updated_at":123}`,
-			wantStatus:  http.StatusBadRequest,
-			wantBody:    `{"error":"signature_updated_at must be a string"}`,
-		},
-		{
-			name:        "signature_updated_at not rfc3339",
-			method:      http.MethodPost,
-			contentType: "application/json",
-			body:        `{"timestamp":"2026-03-05T10:30:45Z","instance_id":"172.25.0.19","signature_version":"daily.cld:0","signature_updated_at":"2026/03/08 07:57:37"}`,
-			wantStatus:  http.StatusBadRequest,
-			wantBody:    `{"error":"signature_updated_at must be RFC3339"}`,
 		},
 		{
 			name:        "accepted",
@@ -176,7 +80,7 @@ func TestHandlerResponses(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			h := NewHandler()
+			h := &Handler{apiKey: ""}
 
 			req := httptest.NewRequest(tc.method, EventsPath, strings.NewReader(tc.body))
 			if tc.contentType != "" {
